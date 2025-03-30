@@ -6,6 +6,7 @@ import os # Import os module for path handling
 
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init()  # Initialize the sound mixer
 
 # --- Screen Setup ---
 try:
@@ -18,8 +19,20 @@ except pygame.error:
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Aim Trainer - Reaction Time Spectrogram")
 
-# --- Load Background Image ---
+# --- Load Background Image and Sound Effect ---
 background_image = None # Initialize as None
+
+# Load sound effect
+explosion_sound = None
+try:
+    sound_path = os.path.join(os.path.dirname(__file__), "50669_423144_423143_Creatures_-_announcer_voice_classic_FPS_style_headshot_normal.ogg")
+    print(f"Loading sound from: {sound_path}")
+    explosion_sound = pygame.mixer.Sound(sound_path)
+    print("Sound effect loaded successfully.")
+except (pygame.error, FileNotFoundError) as e:
+    print(f"Error loading sound effect: {e}")
+    print("Ensure the sound file is in the same directory as the script.")
+
 try:
     # Construct the full path to the image file relative to the script
     script_dir = os.path.dirname(__file__) # Get the directory the script is in
@@ -84,7 +97,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 500  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 400  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -102,7 +115,7 @@ font_tiny = pygame.font.Font(None, 18)
 # --- Spectrogram Configuration ---
 SPEC_HEIGHT = 120
 SPEC_Y_POS = HEIGHT - SPEC_HEIGHT - 40
-SPEC_MAX_TIME_MS = 1000.0
+SPEC_MAX_TIME_MS = TARGET_TIMEOUT_MS
 SPEC_WINDOW_SIZE = 20
 SPEC_MARKER_HEIGHT = 8
 
@@ -113,6 +126,8 @@ VALORANT_SENS_INCREMENT_FINE = 0.005
 VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
 REFERENCE_eDPI = 640.0
+
+TIME_BAR = 300
 
 def calculate_sensitivity_multiplier(dpi, sens):
     current_eDPI = dpi * sens
@@ -216,17 +231,17 @@ def draw_timing_display():
             timer_text = f"{time_ms:.0f} ms"
             color = get_time_color(time_ms, False)  # Use the same color as in the spectrogram
             
-        # Create larger text centered at the top with 20px margin
+        # Create larger text centered in the middle of the screen, offset by 100px up
         text_surface = font_large.render(timer_text, True, color)
         
         # Add background for better readability
-        bg_rect = text_surface.get_rect(center=(WIDTH // 2, 20 + text_surface.get_height() // 2))
+        bg_rect = text_surface.get_rect(center=(WIDTH // 2, CENTER_Y - 100))
         bg_rect_inflated = bg_rect.inflate(20, 10)  # Make the background slightly larger
         pygame.draw.rect(screen, BLACK, bg_rect_inflated)
         pygame.draw.rect(screen, DARK_GREY, bg_rect_inflated, 1)  # Border using spectrogram colors
         
         # Draw the text
-        text_rect = text_surface.get_rect(center=(WIDTH // 2, 20 + text_surface.get_height() // 2))
+        text_rect = text_surface.get_rect(center=(WIDTH // 2, CENTER_Y - 100))
         screen.blit(text_surface, text_rect)
 
 def draw_spectrogram():
@@ -244,7 +259,7 @@ def draw_spectrogram():
 
     axis_color = GREY
     axis_label_color = WHITE
-    for ms_level in [0, 500, 1000]:
+    for ms_level in [0, TIME_BAR, SPEC_MAX_TIME_MS]:
         if ms_level > SPEC_MAX_TIME_MS:
             continue
         normalized_time = ms_level / SPEC_MAX_TIME_MS
@@ -305,6 +320,11 @@ def process_hit():
                 hit_times_ms = hit_times_ms[-SPEC_WINDOW_SIZE:]
                 miss_flags = miss_flags[-SPEC_WINDOW_SIZE:]
             last_hit_info = (circle_x, circle_y, time_taken_ms, False)  # False means not a timeout
+            
+            # Play explosion sound if reaction time is below 280ms
+            if time_taken_ms < TIME_BAR and explosion_sound:
+                explosion_sound.play()
+                
             circle_active = False
             is_delaying = True
             delay_start_time = time.time()
