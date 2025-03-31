@@ -97,7 +97,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 220  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 250  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -128,6 +128,7 @@ DPI_INCREMENT = 50
 REFERENCE_eDPI = 640.0
 
 TIME_BAR = 160
+DONT_CHANGE_TARGET_COLOR = True
 
 def calculate_sensitivity_multiplier(dpi, sens):
     current_eDPI = dpi * sens
@@ -158,7 +159,9 @@ def spawn_circle():
 
 def update_target_color(current_time):
     global target_color, last_color_change_time
-    return
+    if DONT_CHANGE_TARGET_COLOR:
+        return
+    
     time_since_last_change_ms = (current_time - last_color_change_time) * 1000
     
     if time_since_last_change_ms >= TARGET_COLOR_CHANGE_MS:
