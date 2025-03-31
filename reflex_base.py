@@ -357,11 +357,9 @@ while running:
     # --- Event Handling ---
     keys_pressed = pygame.key.get_pressed()
     shift_pressed = keys_pressed[pygame.K_LSHIFT] or keys_pressed[pygame.K_RSHIFT]
-    
-    # Check for left CTRL key (continuous press)
-    if keys_pressed[pygame.K_LCTRL]:
-        process_hit()
 
+    is_hitting = False
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
         if event.type == pygame.KEYDOWN:
@@ -370,6 +368,7 @@ while running:
             # Fire with left CTRL key (single press)
             if event.key == pygame.K_LCTRL:
                 process_hit()
+                is_hitting = True
 
             # Sensitivity Adjustments
             current_sens_increment = VALORANT_SENS_INCREMENT_COARSE if shift_pressed else VALORANT_SENS_INCREMENT_FINE
@@ -388,6 +387,7 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left mouse button
                 process_hit()
+                is_hitting = True
 
         if event.type == pygame.MOUSEMOTION:
             dx, dy = event.rel
@@ -419,7 +419,7 @@ while running:
             delay_start_time = current_frame_time
             current_delay_duration = random.uniform(DELAY_MIN_S, DELAY_MAX_S)
 
-    if is_delaying:
+    if is_delaying and not is_hitting:
         if current_frame_time - delay_start_time >= current_delay_duration:
             is_delaying = False
             spawn_circle()
