@@ -79,7 +79,7 @@ last_color_change_time = 0
 CIRCLE_RADIUS = 5
 
 # --- Spawn Area Configuration ---
-SPAWN_AREA_SIZE = 20
+SPAWN_AREA_SIZE = 0
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
 HALF_SPAWN_SIZE = SPAWN_AREA_SIZE // 2
 MIN_SPAWN_X = max(CIRCLE_RADIUS, CENTER_X - HALF_SPAWN_SIZE)
@@ -97,7 +97,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 400  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 220  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -127,7 +127,7 @@ VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
 REFERENCE_eDPI = 640.0
 
-TIME_BAR = 300
+TIME_BAR = 160
 
 def calculate_sensitivity_multiplier(dpi, sens):
     current_eDPI = dpi * sens
@@ -158,6 +158,7 @@ def spawn_circle():
 
 def update_target_color(current_time):
     global target_color, last_color_change_time
+    return
     time_since_last_change_ms = (current_time - last_color_change_time) * 1000
     
     if time_since_last_change_ms >= TARGET_COLOR_CHANGE_MS:
@@ -213,9 +214,9 @@ def draw_instructions_and_fps(current_fps):
 def get_time_color(time_ms, is_miss):
     if is_miss:
         return RED  # Return red for missed targets
-    elif time_ms <= 250:
+    elif time_ms <= TIME_BAR:
         return GREEN
-    elif time_ms <= 500:
+    elif time_ms <= TARGET_TIMEOUT_MS:
         return ORANGE
     else:
         return PINK
