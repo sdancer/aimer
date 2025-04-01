@@ -177,7 +177,7 @@ def spawn_circle():
     global circle_x, circle_y, circle_active, start_time, timeout_expired, last_color_change_time, target_color, target_type
     
     # Determine target position based on target_type
-    if random.random() < 0.25:
+    if target_type != "random":
         # Center target
         circle_x = CENTER_X
         circle_y = CENTER_Y
@@ -534,7 +534,10 @@ def process_hit():
                 explosion_sound.play()
                 
             # Toggle target type for next spawn
-            target_type = "center" if target_type == "random" else "random"
+            if random.random() > 0.25:
+                target_type = "random"
+            else:
+                target_type = "center"
             
             circle_active = False
             is_delaying = True
@@ -619,7 +622,10 @@ while running:
             # Target timed out - mark as missed
             
             # Toggle target type for next spawn
-            target_type = "center" if target_type == "random" else "random"
+            if random.random() > 0.25:
+                target_type = "random"
+            else:
+                target_type = "center"
             
             timeout_expired = True
             circle_active = False
