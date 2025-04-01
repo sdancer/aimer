@@ -109,7 +109,7 @@ timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
 DELAY_MIN_S = 1.5
-DELAY_MAX_S = 5.0
+DELAY_MAX_S = 2.0
 is_delaying = False
 delay_start_time = 0.0
 current_delay_duration = 0.0

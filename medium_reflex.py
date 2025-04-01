@@ -152,18 +152,17 @@ timeline_events = []
 
 # --- Sensitivity Simulation Settings ---
 target_dpi = 1600
-target_valorant_sens = 0.2
+target_valorant_sens = 0.4
 VALORANT_SENS_INCREMENT_FINE = 0.005
 VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
-REFERENCE_eDPI = 640.0
 
 TIME_BAR = 250
 DONT_CHANGE_TARGET_COLOR = True
 
 def calculate_sensitivity_multiplier(dpi, sens):
     current_eDPI = dpi * sens
-    return current_eDPI / REFERENCE_eDPI
+    return sens
 
 sensitivity_multiplier = calculate_sensitivity_multiplier(target_dpi, target_valorant_sens)
 
