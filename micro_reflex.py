@@ -56,6 +56,12 @@ except FileNotFoundError:
     print("Ensure 'bg1.png' is in the same directory as the script.")
     # background_image will remain None
 
+# Load the image
+image = pygame.image.load("p1.png").convert()
+
+# Set white (255, 255, 255) as the transparent color
+image.set_colorkey((255, 255, 255))
+
 # --- Colors ---
 # Keep colors defined, they might be needed for elements drawn *over* the background
 WHITE = (255, 255, 255)
@@ -69,10 +75,11 @@ ORANGE = (255, 165, 0)     # Medium Times
 PINK = (255, 105, 180)     # Slower Times
 GREY = (150, 150, 150)     # Spectrogram Axis/Labels
 DARK_GREY = (50, 50, 50, 200) # Spectrogram Background (Add Alpha for slight transparency)
+PURPLE = (128, 0, 128)     # New color for off-target hits
 
 # --- Target Color Change Configuration ---
 TARGET_COLOR_CHANGE_MS = 25  # Change color every 25ms
-target_color = RED  # Starting color
+target_color = YELLOW  # Starting color
 last_color_change_time = 0
 
 # --- Circle Properties ---
@@ -97,7 +104,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 400  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 360  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -119,6 +126,25 @@ SPEC_MAX_TIME_MS = TARGET_TIMEOUT_MS
 SPEC_WINDOW_SIZE = 20
 SPEC_MARKER_HEIGHT = 8
 
+# --- Timeline Configuration ---
+TIMELINE_LENGTH_SECONDS = 20
+TIMELINE_HEIGHT = 60
+TIMELINE_Y_POS = SPEC_Y_POS - TIMELINE_HEIGHT - 20
+TIMELINE_BG_COLOR = (30, 30, 30, 200)
+TARGET_ACTIVE_COLOR = (150, 150, 255, 150)  # Semi-transparent blue
+HIT_MARKER_COLOR = GREEN
+MISS_MARKER_COLOR = RED
+OFF_TARGET_HIT_COLOR = PURPLE  # New color for off-target hits
+TIMELINE_AXIS_COLOR = GREY
+
+# --- Timeline Visibility Toggle ---
+show_timeline = True  # New variable to track timeline visibility
+
+# --- Timeline Data Structure ---
+# List of event tuples: (timestamp, event_type, duration)
+# event_type: "target_active", "hit", "miss", "off_target_hit"
+timeline_events = []
+
 # --- Sensitivity Simulation Settings ---
 target_dpi = 1600
 target_valorant_sens = 0.4
@@ -127,7 +153,8 @@ VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
 REFERENCE_eDPI = 640.0
 
-TIME_BAR = 300
+TIME_BAR = 180
+DONT_CHANGE_TARGET_COLOR = True
 
 def calculate_sensitivity_multiplier(dpi, sens):
     current_eDPI = dpi * sens
@@ -153,11 +180,17 @@ def spawn_circle():
     timeout_expired = False
     start_time = time.time()
     last_color_change_time = start_time
-    target_color = RED  # Reset target color when spawning
+    target_color = YELLOW  # Reset target color when spawning
+    
+    # Add target activation event to timeline
+    add_timeline_event("target_active", TARGET_TIMEOUT_MS/1000)  # Convert ms to seconds
 
 
 def update_target_color(current_time):
     global target_color, last_color_change_time
+    if DONT_CHANGE_TARGET_COLOR:
+        return
+    
     time_since_last_change_ms = (current_time - last_color_change_time) * 1000
     
     if time_since_last_change_ms >= TARGET_COLOR_CHANGE_MS:
@@ -194,12 +227,14 @@ def draw_instructions_and_fps(current_fps):
         f"Hits (Last {SPEC_WINDOW_SIZE}): {len(hit_times_ms)}",
         f"Target Timeout: {TARGET_TIMEOUT_MS}ms",
         f"Target Color Change: {TARGET_COLOR_CHANGE_MS}ms",
+        "Timeline: Last 20 seconds",
         "-----------",
         "Controls:",
         "Left Click / Left CTRL: Fire",
         "UP/DOWN: Adjust Val Sens (Fine)",
         "SHIFT+UP/DOWN: Adjust Val Sens (Coarse)",
         "LEFT/RIGHT: Adjust DPI",
+        f"T: {'Hide' if show_timeline else 'Show'} Timeline",
         "ESC: Quit"
     ]
     y_offset = 10
@@ -213,9 +248,9 @@ def draw_instructions_and_fps(current_fps):
 def get_time_color(time_ms, is_miss):
     if is_miss:
         return RED  # Return red for missed targets
-    elif time_ms <= 250:
+    elif time_ms <= TIME_BAR:
         return GREEN
-    elif time_ms <= 500:
+    elif time_ms <= TARGET_TIMEOUT_MS:
         return ORANGE
     else:
         return PINK
@@ -301,6 +336,140 @@ def draw_spectrogram():
     # Draw border around the blitted area on the main screen
     pygame.draw.rect(screen, GREY, (spec_start_x, SPEC_Y_POS, total_spec_width, SPEC_HEIGHT), 1)
 
+def add_timeline_event(event_type, duration=None):
+    global timeline_events
+    
+    """Add an event to the timeline with current timestamp"""
+    current_time = time.time()
+    timeline_events.append((current_time, event_type, duration))
+    
+    # Clean up old events (older than TIMELINE_LENGTH_SECONDS)
+    cutoff_time = current_time - TIMELINE_LENGTH_SECONDS
+    timeline_events = [event for event in timeline_events if event[0] >= cutoff_time]
+
+def draw_timeline():
+    """Draw the timeline showing the last TIMELINE_LENGTH_SECONDS"""
+    # Skip drawing if timeline is hidden
+    if not show_timeline:
+        return
+        
+    current_time = time.time()
+    cutoff_time = current_time - TIMELINE_LENGTH_SECONDS
+    
+    # Timeline dimensions
+    total_timeline_width = WIDTH * 0.8
+    timeline_start_x = (WIDTH - total_timeline_width) / 2
+    
+    # Create a surface for the timeline with alpha channel
+    timeline_surface = pygame.Surface((total_timeline_width, TIMELINE_HEIGHT), pygame.SRCALPHA)
+    timeline_surface.fill(TIMELINE_BG_COLOR)
+    
+    # Draw time markers (every second)
+    for i in range(TIMELINE_LENGTH_SECONDS + 1):
+        sec_pos = total_timeline_width * (1.0 - i / TIMELINE_LENGTH_SECONDS)
+        # Draw tick marks
+        tick_height = 10 if i % 5 == 0 else 5  # Taller tick marks every 5 seconds
+        pygame.draw.line(timeline_surface, TIMELINE_AXIS_COLOR, 
+                        (sec_pos, TIMELINE_HEIGHT), 
+                        (sec_pos, TIMELINE_HEIGHT - tick_height), 
+                        1)
+        
+        # Add labels every 5 seconds
+        if i % 5 == 0:
+            label = font_tiny.render(f"-{i}s", True, WHITE)
+            label_rect = label.get_rect(midtop=(sec_pos, TIMELINE_HEIGHT - 15))
+            timeline_surface.blit(label, label_rect)
+    
+    # Draw horizontal axis line
+    pygame.draw.line(timeline_surface, TIMELINE_AXIS_COLOR, 
+                    (0, TIMELINE_HEIGHT - 1), 
+                    (total_timeline_width, TIMELINE_HEIGHT - 1), 
+                    1)
+    
+    # Draw events on the timeline
+    for timestamp, event_type, duration in timeline_events:
+        # Skip events outside our time window
+        if timestamp < cutoff_time:
+            continue
+        
+        # Calculate position on timeline (transform from time to x-position)
+        relative_time = current_time - timestamp  # seconds ago
+        event_x_pos = total_timeline_width * (1.0 - relative_time / TIMELINE_LENGTH_SECONDS)
+        
+        if event_type == "target_active" and duration is not None:
+            # Draw a rectangle for the duration of target activity
+            rect_width = (duration / TIMELINE_LENGTH_SECONDS) * total_timeline_width
+            rect_height = TIMELINE_HEIGHT - 20  # Leave space for tick marks and time labels
+            pygame.draw.rect(timeline_surface, TARGET_ACTIVE_COLOR, 
+                          (event_x_pos, 0, rect_width, rect_height))
+            pygame.draw.rect(timeline_surface, WHITE, 
+                          (event_x_pos, 0, rect_width, rect_height), 1)
+                          
+        elif event_type == "hit":
+            # Draw a green marker for a hit
+            marker_height = 20
+            pygame.draw.polygon(timeline_surface, HIT_MARKER_COLOR, 
+                             [(event_x_pos, TIMELINE_HEIGHT - 20 - marker_height),
+                              (event_x_pos - 5, TIMELINE_HEIGHT - 20),
+                              (event_x_pos + 5, TIMELINE_HEIGHT - 20)], 
+                             0)  # 0 means filled
+                             
+        elif event_type == "miss":
+            # Draw a red dot for a miss instead of a cross
+            marker_size = 5
+            marker_y = TIMELINE_HEIGHT - 25
+            pygame.draw.circle(timeline_surface, MISS_MARKER_COLOR,
+                           (event_x_pos, marker_y),
+                           marker_size, 0)  # 0 means filled
+                          
+        elif event_type == "off_target_hit":
+            # Draw a purple circle for an off-target hit
+            marker_size = 5
+            marker_y = TIMELINE_HEIGHT - 25
+            pygame.draw.circle(timeline_surface, OFF_TARGET_HIT_COLOR,
+                           (event_x_pos, marker_y),
+                           marker_size, 0)  # 0 means filled
+    
+    # Blit the timeline surface onto the main screen
+    screen.blit(timeline_surface, (timeline_start_x, TIMELINE_Y_POS))
+    
+    # Draw border around the timeline area
+    pygame.draw.rect(screen, GREY, (timeline_start_x, TIMELINE_Y_POS, total_timeline_width, TIMELINE_HEIGHT), 1)
+    
+    # Add timeline label and legend
+    label = font_small.render("Timeline (last 20 seconds)", True, WHITE)
+    label_rect = label.get_rect(bottomleft=(timeline_start_x, TIMELINE_Y_POS - 5))
+    screen.blit(label, label_rect)
+    
+    # Add a small legend to explain the different markers
+    legend_start_x = timeline_start_x + total_timeline_width - 240
+    legend_y = TIMELINE_Y_POS - 25
+    
+    # Hit marker
+    marker_width = 10
+    pygame.draw.polygon(screen, HIT_MARKER_COLOR, 
+                    [(legend_start_x, legend_y),
+                     (legend_start_x - marker_width//2, legend_y + marker_width),
+                     (legend_start_x + marker_width//2, legend_y + marker_width)], 
+                    0)
+    hit_text = font_tiny.render("Hit", True, WHITE)
+    screen.blit(hit_text, (legend_start_x + 10, legend_y))
+    
+    # Off-target hit marker
+    legend_start_x += 60
+    pygame.draw.circle(screen, OFF_TARGET_HIT_COLOR,
+                   (legend_start_x, legend_y + marker_width//2),
+                   marker_width//2, 0)
+    off_hit_text = font_tiny.render("Off-target", True, WHITE)
+    screen.blit(off_hit_text, (legend_start_x + 10, legend_y))
+    
+    # Miss marker (now a dot instead of a cross)
+    legend_start_x += 90
+    pygame.draw.circle(screen, MISS_MARKER_COLOR,
+                   (legend_start_x, legend_y + marker_width//2),
+                   marker_width//2, 0)
+    miss_text = font_tiny.render("Miss", True, WHITE)
+    screen.blit(miss_text, (legend_start_x + 10, legend_y))
 
 def draw_cursor():
     # Draw a small white rectangle with black border
@@ -332,15 +501,25 @@ def process_hit():
                 miss_flags = miss_flags[-SPEC_WINDOW_SIZE:]
             last_hit_info = (circle_x, circle_y, time_taken_ms, False)  # False means not a timeout
             
+            # Add hit event to timeline
+            add_timeline_event("hit")
+            
             # Play explosion sound if reaction time is below 280ms
-            if time_taken_ms < TIME_BAR and explosion_sound:
-                explosion_sound.play()
+            #if explosion_sound:
+            #    explosion_sound.play()
                 
             circle_active = False
             is_delaying = True
             delay_start_time = time.time()
             current_delay_duration = random.uniform(DELAY_MIN_S, DELAY_MAX_S)
             return True
+        else:
+            # Click was made but missed the target
+            add_timeline_event("off_target_hit")
+            return False
+    else:
+        # No active target, but user clicked
+        add_timeline_event("off_target_hit")
     return False
 
 # --- Game Loop ---
@@ -353,19 +532,22 @@ while running:
     # --- Event Handling ---
     keys_pressed = pygame.key.get_pressed()
     shift_pressed = keys_pressed[pygame.K_LSHIFT] or keys_pressed[pygame.K_RSHIFT]
-    
-    # Check for left CTRL key (continuous press)
-    if keys_pressed[pygame.K_LCTRL]:
-        process_hit()
 
+    is_hitting = False
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE: running = False
             
+            # Toggle timeline visibility with T key
+            if event.key == pygame.K_t:
+                show_timeline = not show_timeline
+            
             # Fire with left CTRL key (single press)
             if event.key == pygame.K_LCTRL:
                 process_hit()
+                is_hitting = True
 
             # Sensitivity Adjustments
             current_sens_increment = VALORANT_SENS_INCREMENT_COARSE if shift_pressed else VALORANT_SENS_INCREMENT_FINE
@@ -384,6 +566,7 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left mouse button
                 process_hit()
+                is_hitting = True
 
         if event.type == pygame.MOUSEMOTION:
             dx, dy = event.rel
@@ -411,15 +594,19 @@ while running:
             if len(hit_times_ms) > SPEC_WINDOW_SIZE:
                 hit_times_ms = hit_times_ms[-SPEC_WINDOW_SIZE:]
                 miss_flags = miss_flags[-SPEC_WINDOW_SIZE:]
+                
+            # Add miss event to timeline
+            add_timeline_event("miss")
+                
             is_delaying = True
             delay_start_time = current_frame_time
             current_delay_duration = random.uniform(DELAY_MIN_S, DELAY_MAX_S)
 
-    if is_delaying:
+    if is_delaying and not is_hitting:
         if current_frame_time - delay_start_time >= current_delay_duration:
             is_delaying = False
             spawn_circle()
-    elif not circle_active and not is_delaying:
+    elif not circle_active and not is_delaying and not is_hitting:
          spawn_circle()
 
     # --- Drawing ---
@@ -429,16 +616,19 @@ while running:
     else:
         screen.fill(BLACK) # Fallback to black background if image failed to load
 
+     
     # UI Elements (drawn OVER background)
     current_fps = clock.get_fps()
     draw_instructions_and_fps(current_fps)
     draw_sensitivity_info()
     draw_timing_display()  # Always draw timing display, regardless of circle state
     draw_spectrogram()
+    draw_timeline()  # Draw the timeline if visible
 
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
         pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
+        screen.blit(image, (circle_x-12, circle_y-6))
 
     draw_cursor() # Draw cursor last, on top of everything
     pygame.display.flip()

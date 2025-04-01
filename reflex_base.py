@@ -56,6 +56,12 @@ except FileNotFoundError:
     print("Ensure 'bg1.png' is in the same directory as the script.")
     # background_image will remain None
 
+# Load the image
+image = pygame.image.load("p1.png").convert()
+
+# Set white (255, 255, 255) as the transparent color
+image.set_colorkey((255, 255, 255))
+
 # --- Colors ---
 # Keep colors defined, they might be needed for elements drawn *over* the background
 WHITE = (255, 255, 255)
@@ -73,14 +79,14 @@ PURPLE = (128, 0, 128)     # New color for off-target hits
 
 # --- Target Color Change Configuration ---
 TARGET_COLOR_CHANGE_MS = 25  # Change color every 25ms
-target_color = RED  # Starting color
+target_color = YELLOW  # Starting color
 last_color_change_time = 0
 
 # --- Circle Properties ---
 CIRCLE_RADIUS = 5
 
 # --- Spawn Area Configuration ---
-SPAWN_AREA_SIZE = 0
+SPAWN_AREA_SIZE = 20
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
 HALF_SPAWN_SIZE = SPAWN_AREA_SIZE // 2
 MIN_SPAWN_X = max(CIRCLE_RADIUS, CENTER_X - HALF_SPAWN_SIZE)
@@ -98,7 +104,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 280  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 260  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -174,7 +180,7 @@ def spawn_circle():
     timeout_expired = False
     start_time = time.time()
     last_color_change_time = start_time
-    target_color = RED  # Reset target color when spawning
+    target_color = YELLOW  # Reset target color when spawning
     
     # Add target activation event to timeline
     add_timeline_event("target_active", TARGET_TIMEOUT_MS/1000)  # Convert ms to seconds
@@ -499,8 +505,8 @@ def process_hit():
             add_timeline_event("hit")
             
             # Play explosion sound if reaction time is below 280ms
-            if time_taken_ms < TIME_BAR and explosion_sound:
-                explosion_sound.play()
+            #if explosion_sound:
+            #    explosion_sound.play()
                 
             circle_active = False
             is_delaying = True
@@ -600,7 +606,7 @@ while running:
         if current_frame_time - delay_start_time >= current_delay_duration:
             is_delaying = False
             spawn_circle()
-    elif not circle_active and not is_delaying:
+    elif not circle_active and not is_delaying and not is_hitting:
          spawn_circle()
 
     # --- Drawing ---
@@ -610,6 +616,7 @@ while running:
     else:
         screen.fill(BLACK) # Fallback to black background if image failed to load
 
+     
     # UI Elements (drawn OVER background)
     current_fps = clock.get_fps()
     draw_instructions_and_fps(current_fps)
@@ -621,6 +628,7 @@ while running:
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
         pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
+        screen.blit(image, (circle_x-12, circle_y-6))
 
     draw_cursor() # Draw cursor last, on top of everything
     pygame.display.flip()
