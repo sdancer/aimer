@@ -86,7 +86,7 @@ last_color_change_time = 0
 CIRCLE_RADIUS = 5
 
 # --- Spawn Area Configuration ---
-SPAWN_AREA_SIZE = 20
+SPAWN_AREA_SIZE = 0
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
 HALF_SPAWN_SIZE = SPAWN_AREA_SIZE // 2
 MIN_SPAWN_X = max(CIRCLE_RADIUS, CENTER_X - HALF_SPAWN_SIZE)
@@ -104,12 +104,12 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 260  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 240  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
-DELAY_MIN_S = 1.0
-DELAY_MAX_S = 2.0
+DELAY_MIN_S = 1.5
+DELAY_MAX_S = 5.0
 is_delaying = False
 delay_start_time = 0.0
 current_delay_duration = 0.0
@@ -147,7 +147,7 @@ timeline_events = []
 
 # --- Sensitivity Simulation Settings ---
 target_dpi = 1600
-target_valorant_sens = 0.4
+target_valorant_sens = 0.2
 VALORANT_SENS_INCREMENT_FINE = 0.005
 VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
@@ -414,13 +414,13 @@ def draw_timeline():
                               (event_x_pos + 5, TIMELINE_HEIGHT - 20)], 
                              0)  # 0 means filled
                              
-        elif event_type == "miss":
-            # Draw a red dot for a miss instead of a cross
-            marker_size = 5
-            marker_y = TIMELINE_HEIGHT - 25
-            pygame.draw.circle(timeline_surface, MISS_MARKER_COLOR,
-                           (event_x_pos, marker_y),
-                           marker_size, 0)  # 0 means filled
+        #elif event_type == "miss":
+        #    # Draw a red dot for a miss instead of a cross
+        #    marker_size = 5
+        #    marker_y = TIMELINE_HEIGHT - 25
+        #    pygame.draw.circle(timeline_surface, MISS_MARKER_COLOR,
+        #                   (event_x_pos, marker_y),
+        #                   marker_size, 0)  # 0 means filled
                           
         elif event_type == "off_target_hit":
             # Draw a purple circle for an off-target hit
@@ -627,6 +627,7 @@ while running:
 
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
+        #if (current_frame_time - start_time) < 0.050:
         pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
         screen.blit(image, (circle_x-12, circle_y-6))
 

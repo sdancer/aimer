@@ -86,7 +86,7 @@ last_color_change_time = 0
 CIRCLE_RADIUS = 5
 
 # --- Spawn Area Configuration ---
-SPAWN_AREA_SIZE = 20
+SPAWN_AREA_SIZE = 100
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
 HALF_SPAWN_SIZE = SPAWN_AREA_SIZE // 2
 MIN_SPAWN_X = max(CIRCLE_RADIUS, CENTER_X - HALF_SPAWN_SIZE)
@@ -97,6 +97,11 @@ MAX_SPAWN_Y = min(HEIGHT - CIRCLE_RADIUS, CENTER_Y + HALF_SPAWN_SIZE)
 # --- Game Variables ---
 circle_x = 0
 circle_y = 0
+
+# --- Target Type Management ---
+target_type = "random"  # Starts with random position targets, alternates with "center"
+TARGET_CENTER_TIMEOUT_MS = 200  # Faster timeout for center targets
+
 circle_active = False
 start_time = 0
 hit_times_ms = []
@@ -104,7 +109,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 400  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 600  # Target disappears after x ms
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -169,13 +174,25 @@ pygame.event.set_grab(True)
 
 
 def spawn_circle():
-    global circle_x, circle_y, circle_active, start_time, timeout_expired, last_color_change_time, target_color
-    valid_x_range = MAX_SPAWN_X >= MIN_SPAWN_X
-    valid_y_range = MAX_SPAWN_Y >= MIN_SPAWN_Y
-    if valid_x_range: circle_x = random.randint(MIN_SPAWN_X, MAX_SPAWN_X)
-    else: circle_x = CENTER_X
-    if valid_y_range: circle_y = random.randint(MIN_SPAWN_Y, MAX_SPAWN_Y)
-    else: circle_y = CENTER_Y
+    global circle_x, circle_y, circle_active, start_time, timeout_expired, last_color_change_time, target_color, target_type
+    
+    # Determine target position based on target_type
+    if random.random() < 0.25:
+        # Center target
+        circle_x = CENTER_X
+        circle_y = CENTER_Y
+    else:
+        # Random position target (original behavior)
+        valid_x_range = MAX_SPAWN_X >= MIN_SPAWN_X
+        valid_y_range = MAX_SPAWN_Y >= MIN_SPAWN_Y
+        if valid_x_range: 
+            circle_x = random.randint(MIN_SPAWN_X, MAX_SPAWN_X)
+        else: 
+            circle_x = CENTER_X
+        if valid_y_range: 
+            circle_y = random.randint(MIN_SPAWN_Y, MAX_SPAWN_Y)
+        else: 
+            circle_y = CENTER_Y
     circle_active = True
     timeout_expired = False
     start_time = time.time()
@@ -183,7 +200,11 @@ def spawn_circle():
     target_color = YELLOW  # Reset target color when spawning
     
     # Add target activation event to timeline
-    add_timeline_event("target_active", TARGET_TIMEOUT_MS/1000)  # Convert ms to seconds
+    # Use appropriate timeout based on target type
+    if target_type == "center":
+        add_timeline_event("target_active", TARGET_CENTER_TIMEOUT_MS/1000)  # Convert ms to seconds
+    else:
+        add_timeline_event("target_active", TARGET_TIMEOUT_MS/1000)  # Convert ms to seconds
 
 
 def update_target_color(current_time):
@@ -213,19 +234,23 @@ def update_target_color(current_time):
 def draw_sensitivity_info():
     dpi_text = f"Target DPI: {target_dpi}"
     sens_text = f"Target Val Sens: {target_valorant_sens:.3f}"
+    mode_text = f"Target Mode: {target_type.capitalize()}"
     dpi_surf = font_large.render(dpi_text, True, YELLOW)
     sens_surf = font_large.render(sens_text, True, YELLOW)
+    mode_surf = font_large.render(mode_text, True, YELLOW)
     dpi_rect = dpi_surf.get_rect(topright=(WIDTH - 20, 10))
     sens_rect = sens_surf.get_rect(topright=(WIDTH - 20, 10 + dpi_rect.height + 5))
+    mode_rect = mode_surf.get_rect(topright=(WIDTH - 20, 10 + dpi_rect.height + sens_rect.height + 10))
     screen.blit(dpi_surf, dpi_rect)
     screen.blit(sens_surf, sens_rect)
+    screen.blit(mode_surf, mode_rect)
 
 def draw_instructions_and_fps(current_fps):
     instructions = [
         f"FPS: {current_fps:.0f}",
         f"Spawn Size: {SPAWN_AREA_SIZE}px",
         f"Hits (Last {SPEC_WINDOW_SIZE}): {len(hit_times_ms)}",
-        f"Target Timeout: {TARGET_TIMEOUT_MS}ms",
+        f"Target Timeout: {TARGET_TIMEOUT_MS}ms / Center: {TARGET_CENTER_TIMEOUT_MS}ms",
         f"Target Color Change: {TARGET_COLOR_CHANGE_MS}ms",
         "Timeline: Last 20 seconds",
         "-----------",
@@ -485,7 +510,7 @@ def draw_cursor():
 
 # Function to process hit detection
 def process_hit():
-    global circle_active, is_delaying, delay_start_time, current_delay_duration, last_hit_info, hit_times_ms, miss_flags
+    global circle_active, is_delaying, delay_start_time, current_delay_duration, last_hit_info, hit_times_ms, miss_flags, target_type
     
     if circle_active:
         distance = math.hypot(cursor_x - circle_x, cursor_y - circle_y)
@@ -505,9 +530,12 @@ def process_hit():
             add_timeline_event("hit")
             
             # Play explosion sound if reaction time is below 280ms
-            if explosion_sound and time_taken_ms < TIME_BAR:
+            if explosion_sound and random.random() < 0.25:
                 explosion_sound.play()
                 
+            # Toggle target type for next spawn
+            target_type = "center" if target_type == "random" else "random"
+            
             circle_active = False
             is_delaying = True
             delay_start_time = time.time()
@@ -583,12 +611,20 @@ while running:
     # Check for target timeout
     if circle_active and not timeout_expired:
         time_visible_ms = (current_frame_time - start_time) * 1000
-        if time_visible_ms >= TARGET_TIMEOUT_MS:
+        
+        # Use the appropriate timeout based on target type
+        current_timeout = TARGET_CENTER_TIMEOUT_MS if target_type == "center" else TARGET_TIMEOUT_MS
+        
+        if time_visible_ms >= current_timeout:
             # Target timed out - mark as missed
+            
+            # Toggle target type for next spawn
+            target_type = "center" if target_type == "random" else "random"
+            
             timeout_expired = True
             circle_active = False
-            last_hit_info = (circle_x, circle_y, TARGET_TIMEOUT_MS, True)  # True means it was a timeout
-            hit_times_ms.append(TARGET_TIMEOUT_MS)  # Add timeout value to hit times
+            last_hit_info = (circle_x, circle_y, current_timeout, True)  # True means it was a timeout
+            hit_times_ms.append(current_timeout)  # Add timeout value to hit times
             miss_flags.append(True)  # This was a miss
             # Keep only the latest SPEC_WINDOW_SIZE entries
             if len(hit_times_ms) > SPEC_WINDOW_SIZE:
@@ -628,6 +664,9 @@ while running:
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
         pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
+        # Display different colors or indicators based on target type
+        if target_type == "center":
+            pygame.draw.circle(screen, CYAN, (circle_x, circle_y), CIRCLE_RADIUS + 2, 1)  # Cyan outline for center targets
         screen.blit(image, (circle_x-12, circle_y-6))
 
     draw_cursor() # Draw cursor last, on top of everything
