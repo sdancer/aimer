@@ -152,7 +152,7 @@ timeline_events = []
 
 # --- Sensitivity Simulation Settings ---
 target_dpi = 1600
-target_valorant_sens = 0.4
+target_valorant_sens = 0.2
 VALORANT_SENS_INCREMENT_FINE = 0.005
 VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50

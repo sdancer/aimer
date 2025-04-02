@@ -27,6 +27,16 @@ background_image = None # Initialize as None
 # Load sound effect
 explosion_sound = None
 hit_sound = None
+near_miss_sound = None
+
+try:
+    sound_path = os.path.join(os.path.dirname(__file__), "76097_578556_Swords_-_woosh_Celine_Woodburn_Swords_51_stereo_normal.ogg")
+    print(f"Loading sound from: {sound_path}")
+    near_miss_sound = pygame.mixer.Sound(sound_path)
+    print("Sound effect loaded successfully.")
+except (pygame.error, FileNotFoundError) as e:
+    print(f"Error loading sound effect: {e}")
+    print("Ensure the sound file is in the same directory as the script.")
 
 try:
     sound_path = os.path.join(os.path.dirname(__file__), "metal-hit-94-200422.mp3")
@@ -121,8 +131,8 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 375  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 300  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 300  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 250  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -517,6 +527,11 @@ def draw_cursor():
 # Function to process hit detection
 def process_hit():
     global circle_active, is_delaying, delay_start_time, current_delay_duration, last_hit_info, hit_times_ms, miss_flags, target_type
+    if not circle_active:
+        distance = math.hypot(cursor_x - circle_x, cursor_y - circle_y)
+        if distance <= CIRCLE_RADIUS:
+            if near_miss_sound:
+                near_miss_sound.play()
     
     if circle_active:
         distance = math.hypot(cursor_x - circle_x, cursor_y - circle_y)
