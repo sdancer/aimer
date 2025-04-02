@@ -121,7 +121,7 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 450  # Target disappears after x ms
+TARGET_TIMEOUT_MS = 375  # Target disappears after x ms
 TARGET_CENTER_TIMEOUT_MS = 300  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
@@ -679,8 +679,8 @@ while running:
     if circle_active and not timeout_expired:
         pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
         # Display different colors or indicators based on target type
-        if target_type == "center":
-            pygame.draw.circle(screen, CYAN, (circle_x, circle_y), CIRCLE_RADIUS + 2, 1)  # Cyan outline for center targets
+        #if target_type == "center":
+        #    pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS + 2, 1)  # Cyan outline for center targets
         screen.blit(image, (circle_x-12, circle_y-6))
 
     draw_cursor() # Draw cursor last, on top of everything
