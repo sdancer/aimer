@@ -1,5 +1,3 @@
-# --- START OF MODIFIED FILE horizontal.py ---
-
 import pygame
 import random
 import time
@@ -23,8 +21,6 @@ pygame.display.set_caption("Aim Trainer - Reaction Time Spectrogram")
 
 # --- Load Background Image and Sound Effect ---
 background_image = None # Initialize as None
-
-
 
 # Load sound effect
 explosion_sound = None
@@ -72,26 +68,24 @@ try:
     print("Background image loaded and scaled successfully.")
 
 except pygame.error as e:
-    print(f"Error loading background image 'choke4.png': {e}")
-    print("Ensure 'choke4.png' is in the same directory as the script.")
+    print(f"Error loading background image 'bg1.png': {e}")
+    print("Ensure 'bg1.png' is in the same directory as the script.")
     # background_image will remain None, game will run with black background
 
 except FileNotFoundError:
-    print(f"Error: 'choke4.png' not found.")
-    print("Ensure 'choke4.png' is in the same directory as the script.")
+    print(f"Error: 'bg1.png' not found.")
+    print("Ensure 'bg1.png' is in the same directory as the script.")
     # background_image will remain None
 
-# Load the target overlay image
-image = None
+# Load the target image
 try:
-    image_path = os.path.join(os.path.dirname(__file__), "robot.png")
-    image = pygame.image.load(image_path).convert()
+    target_image_raw = pygame.image.load("robot.png").convert()
     # Set white (255, 255, 255) as the transparent color
-    image.set_colorkey((255, 255, 255))
-    print("Target overlay image 'p1.png' loaded successfully.")
+    target_image_raw.set_colorkey((255, 255, 255))
+    # We will scale this image later based on the circle radius
 except (pygame.error, FileNotFoundError) as e:
-    print(f"Error loading target overlay image 'p1.png': {e}")
-    # image will remain None
+    print(f"Error loading target image 'p1.png': {e}")
+    target_image_raw = None # Set to None if loading fails
 
 # --- Colors ---
 # Keep colors defined, they might be needed for elements drawn *over* the background
@@ -99,7 +93,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)         # Circle and Missed targets
 BLUE = (0, 0, 255)        # Cursor
-YELLOW = (255, 255, 0)     # Sensitivity Info, Default Target Color
+YELLOW = (255, 255, 0)     # Sensitivity Info & Default Target
 CYAN = (0, 255, 255)       # Instructions
 GREEN = (0, 255, 0)        # FPS & Good Times
 ORANGE = (255, 165, 0)     # Medium Times
@@ -112,23 +106,50 @@ PURPLE = (128, 0, 128)     # New color for off-target hits
 TARGET_COLOR_CHANGE_MS = 25  # Change color every 25ms
 target_color = YELLOW  # Starting color
 last_color_change_time = 0
-DONT_CHANGE_TARGET_COLOR = True # Set to True to disable the color shifting based on time
 
-# --- Difficulty Levels ---
-BASE_CIRCLE_RADIUS = 30
-level_radii = {
-    0: BASE_CIRCLE_RADIUS,      # Level 0: Standard size
-    1: BASE_CIRCLE_RADIUS - 5,  # Level 1: 5px smaller
-    2: BASE_CIRCLE_RADIUS - 10, # Level 2: 10px smaller
-}
+# --- Level Configuration ---
 current_level = 0 # Start at level 0
+BASE_CIRCLE_RADIUS = 35
+circle_radius = BASE_CIRCLE_RADIUS # This will be updated based on the level
+target_image_scaled = None # Initialize scaled target image
+
+def update_radius_and_target_image(level):
+    """Updates the circle radius and scales the target image based on the level."""
+    global circle_radius, target_image_scaled, BASE_CIRCLE_RADIUS, target_image_raw
+    if level == 1:
+        circle_radius = BASE_CIRCLE_RADIUS - 5
+    elif level == 2:
+        circle_radius = BASE_CIRCLE_RADIUS - 10
+    elif level == 3:
+        circle_radius = BASE_CIRCLE_RADIUS - 15
+    elif level == 4:
+        circle_radius = BASE_CIRCLE_RADIUS - 20
+    elif level == 5:
+        circle_radius = BASE_CIRCLE_RADIUS - 25
+    elif level == 6:
+        circle_radius = BASE_CIRCLE_RADIUS - 30
+    else: # Level 0 or default
+        circle_radius = BASE_CIRCLE_RADIUS
+
+    # Scale the target image if it was loaded successfully
+    if target_image_raw:
+        # Scale image to roughly match the circle diameter
+        img_size = int(circle_radius * 2 * 0.8) # Scale factor (e.g., 80%)
+        target_image_scaled = pygame.transform.scale(target_image_raw, (img_size, img_size))
+    else:
+        target_image_scaled = None
+
+# Initialize radius and image for the starting level
+update_radius_and_target_image(current_level)
 
 # --- Spawn Area Configuration ---
-# Spawn area remains consistent regardless of target size for simplicity
+# Note: Spawn boundaries might need adjustment if radius changes significantly,
+# but for small changes, keeping them fixed based on BASE_RADIUS is often fine.
+# Let's keep them fixed for now.
 SPAWN_AREA_SIZE = 100
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
 HALF_SPAWN_SIZE = SPAWN_AREA_SIZE // 2
-# Use BASE_CIRCLE_RADIUS for spawn boundaries to keep them consistent
+# Use BASE_CIRCLE_RADIUS for calculating spawn boundaries to keep them consistent
 MIN_SPAWN_X = max(BASE_CIRCLE_RADIUS, CENTER_X - HALF_SPAWN_SIZE)
 MAX_SPAWN_X = min(WIDTH - BASE_CIRCLE_RADIUS, CENTER_X + HALF_SPAWN_SIZE)
 MIN_SPAWN_Y = max(BASE_CIRCLE_RADIUS, CENTER_Y - HALF_SPAWN_SIZE)
@@ -148,8 +169,8 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 400  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 400  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 500  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 500  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -167,7 +188,7 @@ font_tiny = pygame.font.Font(None, 18)
 # --- Spectrogram Configuration ---
 SPEC_HEIGHT = 120
 SPEC_Y_POS = HEIGHT - SPEC_HEIGHT - 40
-SPEC_MAX_TIME_MS = TARGET_TIMEOUT_MS # Base max time on standard timeout
+SPEC_MAX_TIME_MS = TARGET_TIMEOUT_MS
 SPEC_WINDOW_SIZE = 20
 SPEC_MARKER_HEIGHT = 8
 
@@ -197,36 +218,33 @@ VALORANT_SENS_INCREMENT_FINE = 0.005
 VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
 
-TIME_BAR = 250 # Threshold for "good" hit time color
+TIME_BAR = 250
+DONT_CHANGE_TARGET_COLOR = True
 
 def calculate_sensitivity_multiplier(dpi, sens):
-    # No actual sensitivity multiplier needed for raw input, but keep function if needed later
-    # current_eDPI = dpi * sens
-    return 1.0 # For raw input, multiplier is 1
+    current_eDPI = dpi * sens
+    return sens
 
 sensitivity_multiplier = calculate_sensitivity_multiplier(target_dpi, target_valorant_sens)
 
 # --- Custom Cursor ---
 cursor_x, cursor_y = CENTER_X, CENTER_Y
 pygame.mouse.set_visible(False)
-pygame.event.set_grab(True) # Confine mouse to window
+pygame.event.set_grab(True)
 
-
-def get_current_radius():
-    """Returns the circle radius based on the current level."""
-    return level_radii.get(current_level, BASE_CIRCLE_RADIUS) # Default to base if level invalid
 
 def spawn_circle():
     global circle_x, circle_y, circle_active, start_time, timeout_expired, last_color_change_time, target_color, target_type
 
     # Determine target position based on target_type
-    if target_type == "center":
+    if target_type != "random" and False: # Keep center spawn logic if needed later, currently disabled
         # Center target
         circle_x = CENTER_X
         circle_y = CENTER_Y
-    else: # "random"
+    else:
         # Modified random position to be either 25px left or right
-        x_offset = random.choice([25, -25])
+        # Randomly choose -25 or +25 for the x-offset
+        x_offset = random.choice([100, -100]) + random.random() * 100 - 50
         circle_x = CENTER_X + x_offset
         circle_y = CENTER_Y  # Keep y position at center
 
@@ -238,13 +256,14 @@ def spawn_circle():
 
     # Add target activation event to timeline
     # Use appropriate timeout based on target type
-    current_timeout_ms = TARGET_CENTER_TIMEOUT_MS if target_type == "center" else TARGET_TIMEOUT_MS
-    add_timeline_event("target_active", current_timeout_ms / 1000)  # Convert ms to seconds
+    if target_type == "center":
+        add_timeline_event("target_active", TARGET_CENTER_TIMEOUT_MS/1000)  # Convert ms to seconds
+    else:
+        add_timeline_event("target_active", TARGET_TIMEOUT_MS/1000)  # Convert ms to seconds
 
 def update_target_color(current_time):
     global target_color, last_color_change_time
     if DONT_CHANGE_TARGET_COLOR:
-        target_color = YELLOW # Keep it yellow if color change is disabled
         return
 
     time_since_last_change_ms = (current_time - last_color_change_time) * 1000
@@ -256,8 +275,7 @@ def update_target_color(current_time):
 
         # Calculate time visible as a percentage of timeout
         time_visible_ms = (current_time - start_time) * 1000
-        current_timeout_ms = TARGET_CENTER_TIMEOUT_MS if target_type == "center" else TARGET_TIMEOUT_MS
-        progress = min(time_visible_ms / current_timeout_ms, 1.0)
+        progress = min(time_visible_ms / TARGET_TIMEOUT_MS, 1.0)
 
         # Generate a color that shifts from red to yellow as time progresses
         r = 255
@@ -271,32 +289,31 @@ def draw_sensitivity_info():
     dpi_text = f"Target DPI: {target_dpi}"
     sens_text = f"Target Val Sens: {target_valorant_sens:.3f}"
     mode_text = f"Target Mode: {target_type.capitalize()}"
-    level_text = f"Level: {current_level} (Radius: {get_current_radius()}px)" # Display current level and radius
     dpi_surf = font_large.render(dpi_text, True, YELLOW)
     sens_surf = font_large.render(sens_text, True, YELLOW)
     mode_surf = font_large.render(mode_text, True, YELLOW)
-    level_surf = font_large.render(level_text, True, YELLOW) # Render level text
     dpi_rect = dpi_surf.get_rect(topright=(WIDTH - 20, 10))
     sens_rect = sens_surf.get_rect(topright=(WIDTH - 20, 10 + dpi_rect.height + 5))
     mode_rect = mode_surf.get_rect(topright=(WIDTH - 20, 10 + dpi_rect.height + sens_rect.height + 10))
-    level_rect = level_surf.get_rect(topright=(WIDTH - 20, 10 + dpi_rect.height + sens_rect.height + mode_rect.height + 15)) # Position level text
     screen.blit(dpi_surf, dpi_rect)
     screen.blit(sens_surf, sens_rect)
     screen.blit(mode_surf, mode_rect)
-    screen.blit(level_surf, level_rect) # Draw level text
 
 def draw_instructions_and_fps(current_fps):
+    # Use global circle_radius and current_level here
+    global circle_radius, current_level
     instructions = [
         f"FPS: {current_fps:.0f}",
-        #f"Spawn Size: {SPAWN_AREA_SIZE}px", # Less relevant now?
-        f"Hits (Last {SPEC_WINDOW_SIZE}): {len([m for m in miss_flags if not m])}/{len(miss_flags)}", # Show hits / total attempts
+        f"Level: {current_level} (Radius: {circle_radius}px)", # Display current level and radius
+        f"Spawn Size: {SPAWN_AREA_SIZE}px",
+        f"Hits (Last {SPEC_WINDOW_SIZE}): {len(hit_times_ms)}",
         f"Target Timeout: {TARGET_TIMEOUT_MS}ms / Center: {TARGET_CENTER_TIMEOUT_MS}ms",
-        #f"Target Color Change: {TARGET_COLOR_CHANGE_MS}ms" if not DONT_CHANGE_TARGET_COLOR else "Target Color: Fixed",
+        #f"Target Color Change: {TARGET_COLOR_CHANGE_MS}ms", # Removed as color change is disabled
         "Timeline: Last 20 seconds",
         "-----------",
         "Controls:",
+        "0, 1, 2: Select Level", # Added level selection info
         "Left Click / Left CTRL: Fire",
-        "0, 1, 2: Change Level (Target Size)", # Added level control info
         "UP/DOWN: Adjust Val Sens (Fine)",
         "SHIFT+UP/DOWN: Adjust Val Sens (Coarse)",
         "LEFT/RIGHT: Adjust DPI",
@@ -316,9 +333,9 @@ def get_time_color(time_ms, is_miss):
         return RED  # Return red for missed targets
     elif time_ms <= TIME_BAR:
         return GREEN
-    elif time_ms <= TARGET_TIMEOUT_MS: # Use standard timeout for color scale reference
+    elif time_ms <= TARGET_TIMEOUT_MS:
         return ORANGE
-    else: # Times > timeout only possible if timeout > SPEC_MAX_TIME_MS (unlikely setup)
+    else:
         return PINK
 
 def draw_timing_display():
@@ -363,9 +380,9 @@ def draw_spectrogram():
 
     axis_color = GREY
     axis_label_color = WHITE
-    # Draw axis based on SPEC_MAX_TIME_MS
     for ms_level in [0, TIME_BAR, SPEC_MAX_TIME_MS]:
-        if ms_level > SPEC_MAX_TIME_MS: continue # Skip labels beyond max if TIME_BAR > SPEC_MAX_TIME_MS
+        if ms_level > SPEC_MAX_TIME_MS:
+            continue
         normalized_time = ms_level / SPEC_MAX_TIME_MS
         y_pos = SPEC_HEIGHT * (1.0 - normalized_time) # Y pos relative to surface
 
@@ -378,7 +395,6 @@ def draw_spectrogram():
         screen.blit(label_surf, label_rect)
 
     for i, (hit_time, is_miss) in enumerate(zip(hit_times_ms, miss_flags)):
-        # Normalize hit time against the max time displayed on the spectrogram
         normalized_hit_time = min(hit_time / SPEC_MAX_TIME_MS, 1.0)
 
         # Calculate the height of the bar based on hit time
@@ -486,7 +502,7 @@ def draw_timeline():
             marker_size = 5
             marker_y = TIMELINE_HEIGHT - 25
             pygame.draw.circle(timeline_surface, MISS_MARKER_COLOR,
-                           (event_x_pos, marker_y),
+                           (int(event_x_pos), marker_y), # Ensure x is int
                            marker_size, 0)  # 0 means filled
 
         elif event_type == "off_target_hit":
@@ -494,7 +510,7 @@ def draw_timeline():
             marker_size = 5
             marker_y = TIMELINE_HEIGHT - 25
             pygame.draw.circle(timeline_surface, OFF_TARGET_HIT_COLOR,
-                           (event_x_pos, marker_y),
+                           (int(event_x_pos), marker_y), # Ensure x is int
                            marker_size, 0)  # 0 means filled
 
     # Blit the timeline surface onto the main screen
@@ -552,20 +568,24 @@ def draw_cursor():
 
 # Function to process hit detection
 def process_hit():
-    global circle_active, is_delaying, delay_start_time, current_delay_duration, last_hit_info, hit_times_ms, miss_flags, target_type
-    current_radius = get_current_radius() # Get radius for current level
-
-    # Check for near miss sound even if target isn't active
+    # Use global circle_radius here for hit detection
+    global circle_active, is_delaying, delay_start_time, current_delay_duration, last_hit_info, hit_times_ms, miss_flags, target_type, circle_radius
     if not circle_active:
-        # Calculate distance to where the circle *was* or would be if it just timed out
+        # Check for near miss sound even if target isn't active (e.g., during delay)
+        # Calculate distance to where the circle *was* or *will be* (using circle_x, circle_y)
         distance = math.hypot(cursor_x - circle_x, cursor_y - circle_y)
-        if distance <= current_radius + 15: # Slightly larger radius for near miss sound
-             pass # Potentially play near miss sound here, but it might be annoying if clicked often off-target
-             # if near_miss_sound: near_miss_sound.play()
+        # Play sound if click is within a slightly larger radius than the target
+        if distance <= circle_radius * 1.5: # Example: 1.5 times the radius
+             if near_miss_sound:
+                 near_miss_sound.play()
+        # Add off-target event if clicked when no target is active
+        add_timeline_event("off_target_hit")
+        return False # No active target to hit
 
+    # If circle is active, check for hit
     if circle_active:
         distance = math.hypot(cursor_x - circle_x, cursor_y - circle_y)
-        if distance <= current_radius: # Use current level's radius for hit check
+        if distance <= circle_radius: # Use the current circle_radius
             # --- HIT! ---
             time_taken_sec = time.time() - start_time
             time_taken_ms = time_taken_sec * 1000
@@ -573,46 +593,44 @@ def process_hit():
             miss_flags.append(False)  # Not a miss
             # Keep only the latest SPEC_WINDOW_SIZE entries
             if len(hit_times_ms) > SPEC_WINDOW_SIZE:
-                hit_times_ms.pop(0) # Remove oldest
-                miss_flags.pop(0) # Remove oldest
+                hit_times_ms = hit_times_ms[-SPEC_WINDOW_SIZE:]
+                miss_flags = miss_flags[-SPEC_WINDOW_SIZE:]
             last_hit_info = (circle_x, circle_y, time_taken_ms, False)  # False means not a timeout
 
             # Add hit event to timeline
             add_timeline_event("hit")
 
-            # Play explosion sound if reaction time is below 280ms or hit sound otherwise
-            # Reduced headshot probability slightly
-            if random.random() < 0.15: # 15% chance for "headshot" sound
+            # Play sound effects
+            if random.random() < 0.25:
                 if explosion_sound: explosion_sound.play()
             else:
                 if hit_sound: hit_sound.play()
 
-            # Toggle target type for next spawn (50/50 chance)
-            target_type = random.choice(["random", "center"])
+            # Toggle target type for next spawn (optional logic)
+            if random.random() > 0.25:
+                target_type = "random"
+            else:
+                target_type = "center"
 
             circle_active = False
             is_delaying = True
             delay_start_time = time.time()
             current_delay_duration = random.uniform(DELAY_MIN_S, DELAY_MAX_S)
-            return True # Indicate a hit occurred
+            return True
         else:
             # Click was made but missed the active target
             add_timeline_event("off_target_hit")
-            if near_miss_sound: near_miss_sound.play() # Play woosh on miss
-            return False # Indicate click occurred but missed
-    else:
-        # No active target, but user clicked (considered off-target)
-        add_timeline_event("off_target_hit")
-        # Optionally play a different sound for clicking when no target is present
-    return False # Indicate click occurred but no active target to hit
+            # Play near miss sound if click was close
+            if distance <= circle_radius * 1.5: # Example threshold
+                if near_miss_sound:
+                    near_miss_sound.play()
+            return False
+    # This part should technically not be reached if logic above is correct
+    return False
 
 # --- Game Loop ---
 running = True
 clock = pygame.time.Clock()
-
-# Initial spawn call if not delaying
-if not is_delaying and not circle_active:
-     spawn_circle()
 
 while running:
     current_frame_time = time.time()
@@ -621,7 +639,7 @@ while running:
     keys_pressed = pygame.key.get_pressed()
     shift_pressed = keys_pressed[pygame.K_LSHIFT] or keys_pressed[pygame.K_RSHIFT]
 
-    processed_click_this_frame = False # Flag to avoid double processing from key + mouse click
+    is_hitting = False # Flag to prevent immediate respawn after a hit
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
@@ -643,16 +661,27 @@ while running:
             elif event.key == pygame.K_2:
                 current_level = 2
                 level_changed = True
+            elif event.key == pygame.K_3:
+                current_level = 3
+                level_changed = True
+            elif event.key == pygame.K_4:
+                current_level = 4
+                level_changed = True
+            elif event.key == pygame.K_5:
+                current_level = 5
+                level_changed = True
+            elif event.key == pygame.K_6:
+                current_level = 6
+                level_changed = True
 
             if level_changed:
-                print(f"Changed to Level {current_level} (Radius: {get_current_radius()})")
-                # Optional: Cancel current target and respawn immediately? Or let it play out?
-                # For now, let current target play out. Change affects next spawn size implicitly via radius change.
+                update_radius_and_target_image(current_level)
+                print(f"Level changed to {current_level}, Circle Radius set to {circle_radius}")
 
             # Fire with left CTRL key (single press)
-            if event.key == pygame.K_LCTRL and not processed_click_this_frame:
-                process_hit()
-                processed_click_this_frame = True # Mark click processed
+            if event.key == pygame.K_LCTRL:
+                if process_hit():
+                    is_hitting = True # Mark that a hit occurred this frame
 
             # Sensitivity Adjustments
             current_sens_increment = VALORANT_SENS_INCREMENT_COARSE if shift_pressed else VALORANT_SENS_INCREMENT_FINE
@@ -666,24 +695,17 @@ while running:
             target_dpi = max(50, target_dpi)
             if sens_changed:
                  sensitivity_multiplier = calculate_sensitivity_multiplier(target_dpi, target_valorant_sens)
-                 print(f"Sens/DPI changed: DPI={target_dpi}, Sens={target_valorant_sens:.3f}")
 
         # --- Hit Detection with Mouse ---
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1 and not processed_click_this_frame:  # Left mouse button
-                process_hit()
-                processed_click_this_frame = True # Mark click processed
+            if event.button == 1:  # Left mouse button
+                if process_hit():
+                    is_hitting = True # Mark that a hit occurred this frame
 
         if event.type == pygame.MOUSEMOTION:
-            # Use relative motion provided by pygame when mouse is grabbed
             dx, dy = event.rel
-            # Sensitivity multiplier is currently 1.0 (raw input)
-            # If you wanted to simulate different sensitivities, apply multiplier here:
-            # cursor_x += dx * sensitivity_multiplier
-            # cursor_y += dy * sensitivity_multiplier
-            cursor_x += dx
-            cursor_y += dy
-            # Clamp cursor to screen bounds
+            cursor_x += dx * sensitivity_multiplier
+            cursor_y += dy * sensitivity_multiplier
             cursor_x = max(0, min(WIDTH - 1, cursor_x))
             cursor_y = max(0, min(HEIGHT - 1, cursor_y))
 
@@ -702,8 +724,11 @@ while running:
         if time_visible_ms >= current_timeout:
             # Target timed out - mark as missed
 
-            # Toggle target type for next spawn (50/50 chance)
-            target_type = random.choice(["random", "center"])
+            # Toggle target type for next spawn (optional logic)
+            if random.random() > 0.25:
+                target_type = "random"
+            else:
+                target_type = "center"
 
             timeout_expired = True
             circle_active = False
@@ -712,8 +737,8 @@ while running:
             miss_flags.append(True)  # This was a miss
             # Keep only the latest SPEC_WINDOW_SIZE entries
             if len(hit_times_ms) > SPEC_WINDOW_SIZE:
-                 hit_times_ms.pop(0) # Remove oldest
-                 miss_flags.pop(0) # Remove oldest
+                hit_times_ms = hit_times_ms[-SPEC_WINDOW_SIZE:]
+                miss_flags = miss_flags[-SPEC_WINDOW_SIZE:]
 
             # Add miss event to timeline
             add_timeline_event("miss")
@@ -722,13 +747,12 @@ while running:
             delay_start_time = current_frame_time
             current_delay_duration = random.uniform(DELAY_MIN_S, DELAY_MAX_S)
 
-    # Check if delay has ended to spawn next circle
-    if is_delaying:
+    # Handle delay and spawning
+    if is_delaying and not is_hitting: # Only end delay if no hit happened this frame
         if current_frame_time - delay_start_time >= current_delay_duration:
             is_delaying = False
             spawn_circle()
-    # Safety check: if not active, not delaying, spawn immediately (shouldn't normally happen with current logic)
-    elif not circle_active and not is_delaying:
+    elif not circle_active and not is_delaying and not is_hitting: # Only spawn if no hit happened
          spawn_circle()
 
     # --- Drawing ---
@@ -745,31 +769,29 @@ while running:
     draw_sensitivity_info()
     draw_timing_display()  # Always draw timing display, regardless of circle state
     draw_spectrogram()
-    if show_timeline: # Only draw timeline if toggled on
-        draw_timeline()
+    draw_timeline()  # Draw the timeline if visible
 
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
-        current_radius = get_current_radius() # Get radius for current level
-        pygame.draw.circle(screen, target_color, (circle_x, circle_y), current_radius)
-        # Optional: Draw outline or indicator based on target type
-        # if target_type == "center":
-        #    pygame.draw.circle(screen, CYAN, (circle_x, circle_y), current_radius + 2, 1) # Cyan outline for center
+        # Draw the circle itself (optional, can be background for image)
+        pygame.draw.circle(screen, target_color, (circle_x, circle_y), circle_radius)
 
-        # Draw the overlay image if it loaded successfully
-        if image:
-             # Adjust position to center the overlay image (assuming image is 24x12 like p1.png)
-             image_rect = image.get_rect(center=(circle_x, circle_y))
-             screen.blit(image, image_rect)
+        # Draw the scaled target image if it exists
+        if target_image_scaled:
+            # Calculate top-left corner for blitting based on center and image size
+
+            #img_rect = target_image_raw.get_rect(center=(circle_x, circle_y))
+            #screen.blit(target_image_raw, img_rect.topleft)
+            screen.blit(target_image_raw, (circle_x-19, circle_y-6))
+        #else: # Fallback if image didn't load - maybe draw an inner circle?
+        #    pygame.draw.circle(screen, WHITE, (circle_x, circle_y), circle_radius // 2)
 
 
     draw_cursor() # Draw cursor last, on top of everything
     pygame.display.flip()
-    clock.tick(144) # Limit frame rate
+    clock.tick(144) # Limit FPS
 
 # --- Cleanup ---
 pygame.mouse.set_visible(True)
 pygame.event.set_grab(False)
 pygame.quit()
-
-# --- END OF MODIFIED FILE horizontal.py ---
