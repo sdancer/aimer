@@ -22,68 +22,56 @@ pygame.display.set_caption("Aim Trainer - Reaction Time Spectrogram")
 # --- Load Background Image and Sound Effect ---
 background_image = None # Initialize as None
 
-
+def load_sound(fname):
+  try:
+    sound_path = os.path.join(os.path.dirname(__file__), fname)
+    print(f"Loading sound from: {sound_path}")
+    return pygame.mixer.Sound(sound_path)
+    print("Sound effect loaded successfully.")
+  except (pygame.error, FileNotFoundError) as e:
+    print(f"Error loading sound effect: {e}")
+    print("Ensure the sound file is in the same directory as the script.")
+    return None
 
 # Load sound effect
-explosion_sound = None
-hit_sound = None
-near_miss_sound = None
+explosion_sound = load_sound("50669_423144_423143_Creatures_-_announcer_voice_classic_FPS_style_headshot_normal.ogg")
+hit_sound = load_sound("metal-hit-94-200422.mp3")
+near_miss_sound = load_sound("76097_578556_Swords_-_woosh_Celine_Woodburn_Swords_51_stereo_normal.ogg")
 
-try:
-    sound_path = os.path.join(os.path.dirname(__file__), "76097_578556_Swords_-_woosh_Celine_Woodburn_Swords_51_stereo_normal.ogg")
-    print(f"Loading sound from: {sound_path}")
-    near_miss_sound = pygame.mixer.Sound(sound_path)
-    print("Sound effect loaded successfully.")
-except (pygame.error, FileNotFoundError) as e:
-    print(f"Error loading sound effect: {e}")
-    print("Ensure the sound file is in the same directory as the script.")
-
-try:
-    sound_path = os.path.join(os.path.dirname(__file__), "metal-hit-94-200422.mp3")
-    print(f"Loading sound from: {sound_path}")
-    hit_sound = pygame.mixer.Sound(sound_path)
-    print("Sound effect loaded successfully.")
-except (pygame.error, FileNotFoundError) as e:
-    print(f"Error loading sound effect: {e}")
-    print("Ensure the sound file is in the same directory as the script.")
-
-try:
-    sound_path = os.path.join(os.path.dirname(__file__), "50669_423144_423143_Creatures_-_announcer_voice_classic_FPS_style_headshot_normal.ogg")
-    print(f"Loading sound from: {sound_path}")
-    explosion_sound = pygame.mixer.Sound(sound_path)
-    print("Sound effect loaded successfully.")
-except (pygame.error, FileNotFoundError) as e:
-    print(f"Error loading sound effect: {e}")
-    print("Ensure the sound file is in the same directory as the script.")
-
-try:
+def load_background(fname):
+  try:
     # Construct the full path to the image file relative to the script
     script_dir = os.path.dirname(__file__) # Get the directory the script is in
-    image_path = os.path.join(script_dir, "choke4.png")
+    image_path = os.path.join(script_dir, fname)
     print(f"Loading background image from: {image_path}") # Debug print
 
     # Load the image
     raw_background = pygame.image.load(image_path).convert() # Use convert for potential performance boost
 
     # Scale the image to fit the screen resolution
-    background_image = pygame.transform.scale(raw_background, (WIDTH, HEIGHT))
+    r = pygame.transform.scale(raw_background, (WIDTH, HEIGHT))
     print("Background image loaded and scaled successfully.")
+    return r
 
-except pygame.error as e:
+  except pygame.error as e:
     print(f"Error loading background image 'bg1.png': {e}")
     print("Ensure 'bg1.png' is in the same directory as the script.")
     # background_image will remain None, game will run with black background
 
-except FileNotFoundError:
+  except FileNotFoundError:
     print(f"Error: 'bg1.png' not found.")
     print("Ensure 'bg1.png' is in the same directory as the script.")
     # background_image will remain None
+  return None
+
+background_image = load_background("choke0.png")
 
 # Load the image
-image = pygame.image.load("p1.png").convert()
+image = pygame.image.load("neon.png").convert()
 
 # Set white (255, 255, 255) as the transparent color
-image.set_colorkey((255, 255, 255))
+image.set_colorkey((0, 0, 0))
+scaled_image = pygame.transform.scale(image, (1024 * 0.06, 1536 * 0.06))
 
 # --- Colors ---
 # Keep colors defined, they might be needed for elements drawn *over* the background
@@ -106,7 +94,7 @@ target_color = YELLOW  # Starting color
 last_color_change_time = 0
 
 # --- Circle Properties ---
-CIRCLE_RADIUS = 35
+CIRCLE_RADIUS = 5
 
 # --- Spawn Area Configuration ---
 SPAWN_AREA_SIZE = 100
@@ -131,8 +119,8 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 250  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 250  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 400  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 300  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -206,7 +194,7 @@ def spawn_circle():
     else:
         # Modified random position to be either 25px left or right
         # Randomly choose -25 or +25 for the x-offset
-        x_offset = random.choice([25, -25])
+        x_offset = random.choice([25, 0, -25])
         circle_x = CENTER_X + x_offset
         circle_y = CENTER_Y  # Keep y position at center
         
@@ -301,7 +289,7 @@ def draw_timing_display():
         _, _, time_ms, was_timeout = last_hit_info
         
         if was_timeout:
-            timer_text = f"MISSED"
+            timer_text = "MISSED"
             color = RED  # Use red for missed targets
         else:
             timer_text = f"{time_ms:.0f} ms"
@@ -692,11 +680,14 @@ while running:
 
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
-        pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
+        
         # Display different colors or indicators based on target type
         #if target_type == "center":
         #    pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS + 2, 1)  # Cyan outline for center targets
-        screen.blit(image, (circle_x-12, circle_y-6))
+        #screen.blit(image, (circle_x-12, circle_y-6))
+        pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS)
+        screen.blit(scaled_image, (circle_x-27, circle_y-10))
+        
 
     draw_cursor() # Draw cursor last, on top of everything
     pygame.display.flip()

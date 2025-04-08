@@ -59,7 +59,7 @@ except (pygame.error, FileNotFoundError) as e:
 try:
     # Construct the full path to the image file relative to the script
     script_dir = os.path.dirname(__file__) # Get the directory the script is in
-    image_path = os.path.join(script_dir, "choke4.png")
+    image_path = os.path.join(script_dir, "choke6.png")
     print(f"Loading background image from: {image_path}") # Debug print
 
     # Load the image
@@ -80,7 +80,7 @@ except FileNotFoundError:
     # background_image will remain None
 
 # Load the image
-image = pygame.image.load("p1.png").convert()
+image = pygame.image.load("robot.png").convert()
 
 # Set white (255, 255, 255) as the transparent color
 image.set_colorkey((255, 255, 255))
@@ -106,10 +106,10 @@ target_color = YELLOW  # Starting color
 last_color_change_time = 0
 
 # --- Circle Properties ---
-CIRCLE_RADIUS = 35
+CIRCLE_RADIUS = 5
 
 # --- Spawn Area Configuration ---
-SPAWN_AREA_SIZE = 100
+SPAWN_AREA_SIZE = 300
 CENTER_X, CENTER_Y = WIDTH // 2, HEIGHT // 2
 HALF_SPAWN_SIZE = SPAWN_AREA_SIZE // 2
 MIN_SPAWN_X = max(CIRCLE_RADIUS, CENTER_X - HALF_SPAWN_SIZE)
@@ -131,9 +131,12 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 250  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 250  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 900  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 900  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
+TIME_BAR = 700
+DONT_CHANGE_TARGET_COLOR = True
+
 
 # --- Delay Configuration ---
 DELAY_MIN_S = 1.0
@@ -175,13 +178,10 @@ timeline_events = []
 
 # --- Sensitivity Simulation Settings ---
 target_dpi = 1600
-target_valorant_sens = 0.2
+target_valorant_sens = 0.20
 VALORANT_SENS_INCREMENT_FINE = 0.005
 VALORANT_SENS_INCREMENT_COARSE = 0.05
 DPI_INCREMENT = 50
-
-TIME_BAR = 250
-DONT_CHANGE_TARGET_COLOR = True
 
 def calculate_sensitivity_multiplier(dpi, sens):
     current_eDPI = dpi * sens
@@ -206,7 +206,12 @@ def spawn_circle():
     else:
         # Modified random position to be either 25px left or right
         # Randomly choose -25 or +25 for the x-offset
-        x_offset = random.choice([25, -25])
+        x_offset = random.choice([
+            #SPAWN_AREA_SIZE * 0.25, -SPAWN_AREA_SIZE * 0.25,
+            #SPAWN_AREA_SIZE * 0.50, -SPAWN_AREA_SIZE * 0.50,
+            #SPAWN_AREA_SIZE * 0.75, -SPAWN_AREA_SIZE * 0.75,
+            SPAWN_AREA_SIZE, -SPAWN_AREA_SIZE
+            ])
         circle_x = CENTER_X + x_offset
         circle_y = CENTER_Y  # Keep y position at center
         
@@ -301,7 +306,7 @@ def draw_timing_display():
         _, _, time_ms, was_timeout = last_hit_info
         
         if was_timeout:
-            timer_text = f"MISSED"
+            timer_text = "MISSED"
             color = RED  # Use red for missed targets
         else:
             timer_text = f"{time_ms:.0f} ms"
@@ -696,7 +701,7 @@ while running:
         # Display different colors or indicators based on target type
         #if target_type == "center":
         #    pygame.draw.circle(screen, target_color, (circle_x, circle_y), CIRCLE_RADIUS + 2, 1)  # Cyan outline for center targets
-        screen.blit(image, (circle_x-12, circle_y-6))
+        screen.blit(image, (circle_x-19, circle_y-6))
 
     draw_cursor() # Draw cursor last, on top of everything
     pygame.display.flip()

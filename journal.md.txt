@@ -2,3 +2,7 @@
 horizontal stretch goal to 350, something more reacheable while muscles tired
 strech goal same color as normal goal, trying to trick the subconcious
 a unnecesary middle step works well as stretch goal on short term, example swing to the left if gotta hit right
+
+8/april/25
+using 2 big circles of 20px besides horizontal move of 25px in the center, so its just a left/right reflex click without aim
+trying placebo effect by making the circles 26px so no move is needed
