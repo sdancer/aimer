@@ -169,8 +169,8 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 500  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 500  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 700  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 700  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -244,7 +244,7 @@ def spawn_circle():
     else:
         # Modified random position to be either 25px left or right
         # Randomly choose -25 or +25 for the x-offset
-        x_offset = random.choice([100, -100]) + random.random() * 100 - 50
+        x_offset = random.choice([250, -250]) + random.random() * 100 - 50
         circle_x = CENTER_X + x_offset
         circle_y = CENTER_Y  # Keep y position at center
 
