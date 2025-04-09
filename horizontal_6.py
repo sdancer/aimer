@@ -29,6 +29,13 @@ explosion_sound = None
 hit_sound = None
 near_miss_sound = None
 
+# --- Cursor Trail Configuration ---
+TRAIL_MAX_AGE_MS = 1000  # Trail segments disappear after 500ms
+TRAIL_SEGMENT_SIZE = 2   # Size of each trail segment
+MAX_TRAIL_SEGMENTS = 300 # Maximum number of trail segments to prevent memory issues
+# List of tuples (x, y, timestamp, color)
+cursor_trail = []
+
 try:
     sound_path = os.path.join(os.path.dirname(__file__), "76097_578556_Swords_-_woosh_Celine_Woodburn_Swords_51_stereo_normal.ogg")
     print(f"Loading sound from: {sound_path}")
@@ -137,8 +144,8 @@ move_reaction_times = []      # List to store movement reaction times
 last_move_reaction_ms = None  # Store the last movement reaction time for display
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 350  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 350  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 500  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 500  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
@@ -218,7 +225,7 @@ def spawn_circle():
     else:
         # Modified random position to be either 25px left or right
         # Randomly choose -25 or +25 for the x-offset
-        x_offset = random.choice([25, -25])
+        x_offset = random.choice([300, -300])
         circle_x = CENTER_X + x_offset
         circle_y = CENTER_Y  # Keep y position at center
         
@@ -640,6 +647,65 @@ def track_first_movement(dx, dy):
         # Add the first move event to the timeline
         add_timeline_event("first_move")
 
+
+def get_trail_color(time_since_target_ms):
+    """Determine trail segment color based on timing since target appeared"""
+    # If no active target, use a neutral color (even if time_since_target_ms is passed)
+    if not circle_active:
+        return (100, 100, 100, 150)  # Gray with some transparency
+
+    # We have an active target, color based on reaction time
+    if time_since_target_ms <= 100:
+        return (0, 255, 0, 200)  # Green (good) with transparency
+    elif time_since_target_ms <= 200:
+        return (255, 255, 0, 200)  # Yellow (okay) with transparency
+    elif time_since_target_ms <= 300:
+        return (255, 165, 0, 200)  # Orange (getting slow) with transparency
+    else:
+        # Even if it's past the timeout visually, color it red
+        return (255, 0, 0, 200)  # Red (too slow / timed out) with transparency
+
+
+def draw_cursor_trail():
+    """Draw the cursor trail with color-coded segments"""
+    if not cursor_trail:  # Skip if trail is empty
+        return
+
+    current_time = time.time()
+
+    # Need to create a surface with alpha for the trail
+    trail_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+
+    # Draw each trail segment with color based on how quickly it was created after target spawn
+    for i, (x, y, timestamp, color) in enumerate(cursor_trail):
+        # Calculate age of this segment for fade effect
+        age_ms = (current_time - timestamp) * 1000
+        age_factor = 1.0 - min(1.0, age_ms / TRAIL_MAX_AGE_MS) # Fade based on segment age
+
+        # Adjust alpha based on age (newer segments are more opaque)
+        segment_color = list(color)
+        if len(segment_color) >= 4:  # Make sure color has alpha channel
+            segment_color[3] = int(segment_color[3] * age_factor)
+        else:
+            # Should not happen with get_trail_color, but as fallback
+            segment_color.append(int(255 * age_factor))
+
+        # Draw the trail segment as a small circle with fading based on age
+        # Ensure color alpha is valid
+        if segment_color[3] > 0:
+             pygame.draw.circle(trail_surface, tuple(segment_color), (int(x), int(y)), TRAIL_SEGMENT_SIZE)
+
+    # Blit the trail surface onto the main screen
+    screen.blit(trail_surface, (0, 0))
+
+def update_cursor_trail(current_time):
+    """Update the cursor trail, removing old segments""" # Removed alpha update, handled in draw
+    global cursor_trail
+
+    # Remove segments older than TRAIL_MAX_AGE_MS
+    cutoff_time = current_time - (TRAIL_MAX_AGE_MS / 1000.0)
+    cursor_trail = [seg for seg in cursor_trail if seg[2] >= cutoff_time]
+
 # --- Game Loop ---
 running = True
 clock = pygame.time.Clock()
@@ -696,6 +762,19 @@ while running:
             # Track the first movement after target appears
             track_first_movement(dx, dy)
 
+
+            # --- ADD TO CURSOR TRAIL ---
+            time_since_target_ms = 0
+            if circle_active:
+                time_since_target_ms = (current_frame_time - start_time) * 1000
+
+            trail_color = get_trail_color(time_since_target_ms)
+            cursor_trail.append((cursor_x, cursor_y, current_frame_time, trail_color))
+
+            # Limit the number of trail segments
+            if len(cursor_trail) > MAX_TRAIL_SEGMENTS:
+                cursor_trail.pop(0) # Remove the oldest segment
+                
     # --- Game Logic ---
     # Update target color if active
     if circle_active and not timeout_expired:
@@ -707,6 +786,9 @@ while running:
         
         # Use the appropriate timeout based on target type
         current_timeout = TARGET_CENTER_TIMEOUT_MS if target_type == "center" else TARGET_TIMEOUT_MS
+
+        # --- UPDATE CURSOR TRAIL ---
+        update_cursor_trail(current_frame_time) # Remove old segments
         
         if time_visible_ms >= current_timeout:
             # Target timed out - mark as missed
@@ -756,6 +838,9 @@ while running:
     draw_timing_display()  # Always draw timing display, regardless of circle state
     draw_spectrogram()
     draw_timeline()  # Draw the timeline if visible
+
+    # --- DRAW CURSOR TRAIL ---
+    draw_cursor_trail() # Draw the trail before the target and cursor
 
     # Game Elements (drawn OVER background and some UI)
     if circle_active and not timeout_expired:
