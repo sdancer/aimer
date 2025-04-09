@@ -106,7 +106,7 @@ target_color = YELLOW  # Starting color
 last_color_change_time = 0
 
 # --- Circle Properties ---
-CIRCLE_RADIUS = 35
+CIRCLE_RADIUS = 35 - 15
 
 # --- Spawn Area Configuration ---
 SPAWN_AREA_SIZE = 100
@@ -131,8 +131,8 @@ miss_flags = []  # New list to track whether each entry was a miss
 last_hit_info = None
 
 # --- Target Timeout Configuration ---
-TARGET_TIMEOUT_MS = 250  # Target disappears after x ms
-TARGET_CENTER_TIMEOUT_MS = 250  # Faster timeout for center targets
+TARGET_TIMEOUT_MS = 350  # Target disappears after x ms
+TARGET_CENTER_TIMEOUT_MS = 350  # Faster timeout for center targets
 timeout_expired = False  # Track if the target timed out
 
 # --- Delay Configuration ---
