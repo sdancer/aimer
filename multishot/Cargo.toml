@@ -1,0 +1,16 @@
+[package]
+name = "multishot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+macroquad = { version = "0.4", default-features = false }
+winit = "0.30.12"
+softbuffer = "0.4.8"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
